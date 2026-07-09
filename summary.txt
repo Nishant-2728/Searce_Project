@@ -1,44 +1,263 @@
-Summary of changes made in this session
+Neural Taste Profile — Codebase Summary
 ========================================
+(For future contributors: what this project is, how it's built, and what's
+left to do. See CLAUDE.md for authoritative developer instructions and
+prompt.md for the original RFP spec this was built against.)
 
-1. Added app/Makefile
-   Wraps the existing venv/pip/streamlit/pytest commands as make targets:
-     make venv          - create .venv
-     make install        - install requirements.txt into .venv
-     make install-dev    - install requirements-dev.txt (adds pytest)
-     make run             - streamlit run app.py
-     make test            - run pytest
-     make test-verbose    - run pytest -v
-     make clean           - remove .venv and pycache/pytest cache
-   Verified working: make install-dev and make test both run cleanly.
 
-2. Fixed stale paths in CLAUDE.md
-   The doc referred to a "streamlit_app/" directory throughout (Commands,
-   Architecture, Tests sections), but the actual directory in the repo is
-   "app/". Updated every reference from streamlit_app/ to app/, and added
-   a note under Commands pointing to the new Makefile shortcuts.
+1. WHAT THIS IS
+----------------
+A single-page Streamlit prototype built for RFP 2 (Zomato) of a Searce
+internal intern assignment on AI & Digital Transformation. It's a technical
+proof-of-concept for one claim: food recommendation apps suffer from
+"Discovery Fatigue" because they (a) treat every user the same regardless of
+real-time context — mood, time of day, recent activity — and (b) categorize
+food by broad cuisine label instead of actual flavor properties.
 
-3. Fixed a flaky assertion in app/tests/test_app.py
-   test_full_scenario_matches_independently_computed_expected_top_result
-   previously hardcoded an exact expected score (Margherita Pizza @ 86.6%
-   similarity). Root cause: app.py derives its time bucket from
-   datetime.now(), and TIME_DELTAS differ per bucket (Morning/Afternoon/
-   Evening/Late Night), so the real similarity score shifts depending on
-   what time of day the test suite runs (observed 89.6% and 90.4% in
-   back-to-back manual runs). Hardcoding any single percentage was
-   inherently flaky, not just out of date.
+The pitch: represent every dish as a 14-dimensional **flavor vector**
+instead of a cuisine tag, convert real-time context (time of day + mood +
+activity + free-text craving) into a **target flavor vector** using
+explicit, hardcoded rules, and rank dishes by **cosine similarity** between
+the two. This produces recommendations that are more personalized than
+category browsing and — critically for the "jury" pitch — fully
+explainable: every score can be traced back to specific input signals.
 
-   Fix: the test now computes its own expectation independently, using
-   get_time_bucket(datetime.now()) + compute_target_vector(...) +
-   rank_dishes(...) from context_engine/matching_engine, and asserts the
-   app's rendered output matches that computed top dish and score. This
-   keeps the test correct at any time of day instead of pinned to a
-   stale/time-dependent number.
+Note: prompt.md (the original spec handed to Claude Code) asked for a
+single-file **React** app using recharts for the radar chart. What was
+actually built is a **Streamlit** app instead, split across 5 Python
+modules. Functionally it satisfies the same spec (flavor vectors, rule-based
+context engine, cosine similarity matching, radar charts, "why" explanation)
+— just a different tech stack. Worth knowing if anyone compares this repo
+back against prompt.md and wonders why the architecture doesn't match section
+4 ("UI/UX") verbatim.
 
-   Updated CLAUDE.md's description of this test to match (no longer
-   claims a fixed percentage; explains the time-of-day dependency and the
-   independently-computed-expectation approach).
+HARD CONSTRAINT (do not violate): no LLM/AI API calls anywhere in this app.
+All context parsing, including the free-text craving box, is rule-based
+keyword/substring matching against hardcoded delta tables. This is
+intentional — deterministic, offline, zero-latency, fully auditable in front
+of a jury. Do not "improve" the matching or text parsing by wiring in an
+OpenAI/Anthropic call or any other external inference.
 
-Verification
-------------
-`make test` (52 tests) passes cleanly after all three fixes.
+
+2. HOW THE PIPELINE WORKS END TO END
+--------------------------------------
+1. On page load, app.py reads the current time via datetime.now() and buckets
+   it into Morning / Afternoon / Evening / Late Night (context_engine.py).
+2. The user picks one mood (radio, 8 options, none pre-selected), any number
+   of activities (multiselect, 6 options), and optionally types a free-text
+   craving (e.g. "something crunchy and tangy").
+3. On clicking "Find My Meal", compute_target_vector() starts from a neutral
+   baseline (5 on all 14 dimensions) and sums in a fixed delta vector for
+   the time bucket, the selected mood, each selected activity, and every
+   keyword substring-matched in the free text — then clamps every dimension
+   to 0-10. It also returns a `contributions` list (which input contributed
+   which delta) used later for explanations.
+4. rank_dishes() computes cosine similarity between the target vector and
+   all 40 dishes' vectors (matching_engine.py, numpy) and sorts best-first;
+   the app takes the top 5.
+5. explain_match() finds the 2-3 dimensions with the highest
+   target*dish product per result, and for each one finds whichever input
+   contributed the largest positive delta to it — producing a string like
+   "High Warmth + Richness match — driven by Late Night and Stressed."
+6. Each of the 5 results is rendered as a card: name, cuisine, prep time,
+   similarity %, a Plotly radar chart of the dish's own 14-dim vector
+   (charts.py), and the explanation string.
+7. Because Streamlit reruns the whole script on every widget interaction,
+   results are cached in st.session_state.results on button click so they
+   survive unrelated reruns (e.g. typing further in the craving box)
+   instead of vanishing.
+
+
+3. FILE-BY-FILE (app/)
+------------------------
+- dishes.py (95 lines) — single source of truth for vector shape.
+  DIMENSIONS: the 14 canonical flavor dimensions in fixed order (spice,
+  acidity, richness, warmth, crunch, umami, sweetness, bitterness,
+  saltiness, freshness, moisture, aroma, chewiness, temp_contrast).
+  DIM_LABELS: display names. DISHES: 40 hand-authored dishes across 8
+  cuisine buckets (North Indian, South Indian, Chinese, Italian,
+  Continental, Fast Food, Desserts, Beverages; 5 dishes each), each with a
+  14-dim vector (0-10 per dim, built positionally via vec(...)) plus
+  cuisine/prep_time_minutes/meal_type metadata. No Streamlit import — plain
+  data.
+
+- context_engine.py (150 lines) — the Context Engine. Four delta tables:
+  TIME_DELTAS (4 buckets), MOOD_DELTAS (8 moods), ACTIVITY_DELTAS (6
+  activities), KEYWORD_DELTAS (31 free-text substrings, e.g. "crunchy"
+  -> {crunch: +3}, "fresh" -> {freshness: +3, richness: -1}). Each delta
+  only sets the dimensions it actually affects; everything else defaults to
+  0. get_time_bucket(now) buckets an hour into the 4 time-of-day labels.
+  compute_target_vector(...) is the core function described in section 2.
+  Deliberately flat/explicit dicts, no derived logic — that's the
+  "auditability" story for the RFP. No Streamlit import.
+
+- matching_engine.py (67 lines) — the Matching Engine. cosine_similarity()
+  (numpy, handles zero-vector edge case by returning 0.0 instead of
+  dividing by zero), rank_dishes() (sorts all dishes best-first),
+  explain_match() (top-dimension + top-source attribution described in
+  section 2). No Streamlit import.
+
+- charts.py (33 lines) — make_radar_chart(vector, title) builds a Plotly
+  go.Scatterpolar figure for one 14-dim vector, closing the polygon by
+  repeating the first point. Only used for per-dish cards today (see
+  "possible additions" below — the target/context vector itself is never
+  visualized).
+
+- app.py (86 lines) — Streamlit UI only, no data or matching logic. Wires
+  widgets to the pipeline in section 2 and renders the result cards in a
+  2-column layout.
+
+- tests/ (43 tests total, pytest) — see section 5.
+
+- Makefile — make venv / install / install-dev / run / test / test-verbose
+  / clean, wrapping the manual venv+pip+streamlit+pytest commands.
+
+
+4. DATA MODEL DETAIL
+----------------------
+- 14 flavor dimensions, each scored 0-10 per dish, all hand-authored to be
+  "plausible" per cuisine (e.g. Butter Chicken: richness 9, warmth 8,
+  spice 5; Nimbu Pani: acidity 8, freshness 9, moisture 9, spice 1).
+- temp_contrast is 0 for every single dish in the current dataset except
+  Ice Cream Sundae (6) — this dimension is essentially unused/decorative
+  right now. Worth flagging to anyone extending the dataset: either author
+  more dishes that actually vary on this axis (e.g. sizzling platters,
+  affogato) or reconsider whether it earns its place as a 14th dimension.
+- Dish metadata: id, name, cuisine, prep_time_minutes, meal_type (list,
+  can span multiple meal types) — meal_type is captured but never actually
+  used to filter/boost recommendations anywhere in the current pipeline
+  (see "possible additions" below).
+
+
+5. TESTS (app/tests/, 52 tests total via pytest collection, pytest)
+------------------------------------------------------------------
+- test_dishes.py (9) — dataset shape: dish count, unique ids/names, all 14
+  dims present and in 0-10, required metadata, vec() positional mapping.
+- test_context_engine.py (23 collected, incl. parametrized cases) — delta-
+  table coverage (every mood/activity has a delta entry), get_time_bucket
+  boundary conditions (parametrized across all 4 bucket edges),
+  compute_target_vector baseline/clamping/case-insensitive keyword
+  matching/no-mood handling, contributions list shape.
+- test_matching_engine.py (10) — cosine_similarity properties (self=1,
+  symmetric, no div-by-zero on a zero vector), rank_dishes ordering,
+  explain_match correctness against small hand-constructed vectors (known
+  expected attribution, not just "didn't crash").
+- test_charts.py (4) — make_radar_chart returns a Figure, closes the
+  polygon, handles every dish in the dataset.
+- test_app.py (6) — integration tests running the real app.py headlessly via
+  streamlit.testing.v1.AppTest (no browser). Covers no-mood-selected path,
+  session-state persistence across an unrelated rerun, different moods
+  producing different top-5 results, and one scenario (Stressed + "Long day
+  at work" + "something crunchy and tangy") whose expected top result is
+  computed independently in the test itself (via context_engine/
+  matching_engine) rather than hardcoded, since the app's time bucket comes
+  from datetime.now() and the "real" answer shifts by time of day.
+
+All three core logic modules (dishes/context_engine/matching_engine) are
+plain, side-effect-free, Streamlit-free — importable and testable in
+isolation, which is what makes the above possible without a browser.
+
+
+6. HOW TO RUN
+---------------
+cd app
+make install-dev   # venv + requirements.txt + requirements-dev.txt (pytest)
+make run           # streamlit run app.py -> http://localhost:8501
+make test           # pytest, whole suite
+make test-verbose   # pytest -v
+
+(Or the manual venv/pip/streamlit/pytest commands — see CLAUDE.md.)
+
+There is no linter configured, no backend, no auth, no persistence — this is
+a static, client-only prototype by design (see prompt.md section 5,
+"Explicitly Out of Scope").
+
+
+7. WHAT'S LEFT / POSSIBLE ADDITIONS FOR THE NEXT DEVELOPER
+--------------------------------------------------------------
+This is a proof-of-concept for one narrow claim (flavor vectors + rule-based
+context + cosine similarity beats cuisine browsing), deliberately scoped
+down per prompt.md. Everything below is *not* a bug — it's scope that was
+intentionally left out, but worth knowing about if the project moves beyond
+"prove the concept to a jury" into "build something more complete":
+
+Frontend / UX polish
+  - The original spec (prompt.md) asked for a React app; this is Streamlit,
+    which is fast to build but caps how far the visual design can go
+    (limited layout control, default widget styling, no custom animations/
+    transitions). A React/Next.js rebuild (recharts for radar charts, as
+    originally specified) would give a much more "credible in front of a
+    jury" look and could actually match prompt.md's UI/UX section more
+    closely.
+  - The target/context flavor vector itself is never visualized — only each
+    dish's vector gets a radar chart. Showing the user's *target* vector
+    (e.g. overlaid on or next to each dish's radar chart) would make the
+    "why this matched" story even more visually obvious.
+  - No loading state / empty state polish beyond a single placeholder
+    caption; no mobile-responsive layout consideration (Streamlit's
+    st.columns(2) is not guaranteed to look good on narrow screens).
+  - No visual distinction for the mood radio buttons beyond Streamlit's
+    default (prompt.md asked for "visually distinct when active" chip
+    styling).
+
+Functionality gaps
+  - meal_type metadata exists on every dish but is never used to filter or
+    boost results (e.g. someone asking for a meal at 8am currently could get
+    Gulab Jamun ranked #1 purely on vector similarity, even though it's
+    dessert-only metadata-wise). A meal-type-aware boost/filter would be a
+    natural, still-fully-rule-based next feature.
+  - temp_contrast is effectively a dead dimension (0 for 39/40 dishes) — see
+    section 4.
+  - No way to give feedback on a result (thumbs up/down) even though a real
+    product would eventually want that signal — out of scope per prompt.md
+    but worth flagging for the "To-Be Process" narrative in the full RFP
+    response.
+  - No handling for dietary constraints (veg/non-veg/allergens) despite this
+    being a natural axis for a food app — not in the current dish metadata
+    at all.
+
+Test coverage gaps
+  - No test currently asserts on KEYWORD_DELTAS coverage the way mood/
+    activity delta coverage is tested (e.g. "every keyword maps to at least
+    one real dimension in DIMENSIONS") — would catch typos in a future
+    delta-table edit.
+  - No test exercises multiple free-text keywords matching simultaneously
+    combined with a mood + multiple activities all firing at once (an
+    "everything at once" stress test), only combinations of 2-3 signals.
+  - No performance/regression test that cosine ranking stays stable/
+    correct as the dish dataset grows past 40 (relevant if the dataset is
+    ever scaled toward a "real vector database" per the RFP's future-state
+    architecture).
+  - test_app.py's AppTest-based integration tests are the slowest and most
+    valuable regression net in the suite; if the frontend is ever rebuilt
+    (e.g. in React, per above), that entire integration-test approach goes
+    away and would need a replacement (e.g. Playwright/Cypress).
+
+Documentation / RFP narrative
+  - This repo is only the technical proof-of-concept; the full RFP response
+    (per prompt.md's context) still needs a To-Be Process narrative, a GCP
+    architecture diagram (e.g. real vector DB, Fit API -> Pub/Sub for
+    wearable/health context, actual ML-based flavor extraction from a real
+    menu-ingestion pipeline), a Bill of Materials, ROI estimate, and
+    timeline — none of which live in this repo and would need to be
+    authored separately (e.g. slides/doc, not code).
+
+
+8. PRIOR SESSION CHANGELOG (kept for reference)
+--------------------------------------------------
+- Added app/Makefile (venv/install/install-dev/run/test/test-verbose/clean
+  targets) wrapping the manual commands.
+- Fixed stale "streamlit_app/" directory references in CLAUDE.md (actual
+  directory is "app/") across Commands/Architecture/Tests sections; added a
+  Makefile pointer.
+- Fixed a flaky assertion in test_app.py
+  (test_full_scenario_matches_independently_computed_expected_top_result):
+  it previously hardcoded an exact expected score, but since app.py derives
+  its time bucket from datetime.now() and TIME_DELTAS differ per bucket, the
+  real similarity score shifts depending on time of day (observed 89.6% vs
+  90.4% in back-to-back runs). Fixed by having the test compute its own
+  expectation independently via get_time_bucket/compute_target_vector/
+  rank_dishes rather than pinning a stale number. CLAUDE.md's description of
+  this test was updated to match.
+  Verified: `make test` (52 tests) passed cleanly after all three fixes —
+  reconfirmed still accurate as of this session (see section 5).
