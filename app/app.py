@@ -105,6 +105,7 @@ if results:
                         "displayModeBar": True,
                         "modeBarButtonsToRemove": ["zoom2d", "pan2d", "lasso2d"],
                         "toImageButtonOptions": {"format": "png"}
+                        "displaylogo": False
                     }
                 )
                 st.info(entry["explanation"])
