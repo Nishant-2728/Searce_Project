@@ -18,7 +18,7 @@ from datetime import datetime
 import streamlit as st
 
 from charts import make_radar_chart
-from context_engine import ACTIVITIES, MOODS, compute_target_vector, get_time_bucket
+from context_engine import ACTIVITIES, MOODS, KEYWORD_DELTAS, compute_target_vector, get_time_bucket
 from dishes import DISHES
 from matching_engine import explain_match, rank_dishes
 
@@ -48,7 +48,14 @@ st.subheader("What's going on? (pick any)")
 activities = st.multiselect("Activities", ACTIVITIES, label_visibility="collapsed")
 
 st.subheader("Craving anything specific?")
-craving = st.text_input("Craving", placeholder="e.g. something crunchy and tangy", label_visibility="collapsed")
+craving_keywords = st.multiselect(
+    "Craving",
+    sorted(KEYWORD_DELTAS.keys()),
+    label_visibility="collapsed",
+    placeholder="e.g. spicy, tangy, fresh, crunchy..."
+)
+# Convert list of keywords back to space-separated string for the engine
+craving = " ".join(craving_keywords)
 
 find_meal = st.button("Find My Meal", type="primary", width="stretch")
 
@@ -102,4 +109,4 @@ if results:
                 )
                 st.info(entry["explanation"])
 else:
-    st.markdown("_Pick a mood, add any activities, and hit **Find My Meal** to see your matches._")
+    st.markdown("_Pick a mood, add any activities, select cravings, and hit **Find My Meal** to see your matches._")
