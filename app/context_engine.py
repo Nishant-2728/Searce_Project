@@ -15,6 +15,8 @@ MOODS = ["Stressed", "Relaxed", "Tired", "Energized", "Anxious", "Celebratory", 
 
 ACTIVITIES = ["Just worked out", "Long day at work", "Lazy Sunday", "Traveling", "Sick / unwell", "Hosting guests"]
 
+WEATHER_CONDITIONS = ["Sunny", "Cloudy", "Rainy", "Hot", "Cold"]
+
 TIME_DELTAS = {
     "Morning": {"freshness": 2, "crunch": 1, "richness": -1, "warmth": 1},
     "Afternoon": {"richness": 1, "umami": 1, "saltiness": 1},
@@ -40,6 +42,14 @@ ACTIVITY_DELTAS = {
     "Traveling": {"saltiness": 2, "crunch": 2, "moisture": -1},
     "Sick / unwell": {"warmth": 3, "moisture": 3, "spice": -3, "crunch": -2},
     "Hosting guests": {"aroma": 2, "umami": 2, "richness": 1},
+}
+
+WEATHER_DELTAS = {
+    "Sunny": {"freshness": 2, "crunch": 1, "richness": -1},
+    "Cloudy": {"warmth": 1, "richness": 1},
+    "Rainy": {"warmth": 3, "richness": 2, "moisture": 1, "freshness": -2},
+    "Hot": {"freshness": 2, "moisture": 2, "richness": -1, "spice": -1},
+    "Cold": {"warmth": 3, "richness": 2, "spice": 1, "freshness": -2},
 }
 
 # Free-text craving box: rule-based keyword -> flavor-delta lookup. No model.
@@ -104,14 +114,21 @@ def _clamp_vector(vector):
         vector[dim] = min(10, max(0, vector[dim]))
 
 
-def compute_target_vector(time_bucket, mood, activities, free_text):
+def compute_target_vector(time_bucket, mood, activities, free_text, weather=None):
     """
     Builds the Target Flavor Vector for the current context.
 
     Starts every dimension at a neutral baseline of 5, then sums in the fixed
     delta for the time bucket, the selected mood (if any), each selected
-    activity, and every keyword matched (via plain substring search) in the
-    free-text craving box. Result is clamped back to 0-10.
+    activity, weather (if provided), and every keyword matched (via plain 
+    substring search) in the free-text craving box. Result is clamped back to 0-10.
+
+    Args:
+        time_bucket: one of Morning/Afternoon/Evening/Late Night
+        mood: selected mood or None
+        activities: list of selected activities
+        free_text: free-form craving text
+        weather: weather condition (e.g., "Sunny", "Rainy", "Hot", "Cold") or None
 
     Returns (vector, contributions, matched_keywords):
       - vector: the final 14-dim target flavor vector (dict).
@@ -136,6 +153,11 @@ def compute_target_vector(time_bucket, mood, activities, free_text):
         activity_delta = ACTIVITY_DELTAS[activity]
         contributions.append({"source": activity, "delta": activity_delta})
         _add_delta(vector, activity_delta)
+
+    if weather and weather in WEATHER_DELTAS:
+        weather_delta = WEATHER_DELTAS[weather]
+        contributions.append({"source": weather, "delta": weather_delta})
+        _add_delta(vector, weather_delta)
 
     matched_keywords = []
     lower_craving = free_text.lower()
