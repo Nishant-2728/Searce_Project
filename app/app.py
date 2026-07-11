@@ -24,6 +24,17 @@ from matching_engine import explain_match, rank_dishes
 
 st.set_page_config(page_title="Neural Taste Profile", page_icon="🍽️", layout="wide")
 
+# Customize Plotly chart toolbar
+st.markdown(
+    """
+    <style>
+    [data-testid="stPlotlyChart"] > div > div > svg [data-title="Zoom"] { display: none !important; }
+    [data-testid="stPlotlyChart"] > div > div > svg [data-title="Pan"] { display: none !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.title("Neural Taste Profile")
 st.caption("Flavor-vector matching, not cuisine labels — a deterministic proof-of-concept for Discovery Fatigue.")
 
