@@ -80,7 +80,11 @@ if results:
                 st.markdown(f"### {dish['name']}")
                 st.caption(f"{dish['cuisine']} · {dish['prep_time_minutes']} min")
                 st.markdown(f":green[{entry['score'] * 100:.1f}% similarity]")
-                st.plotly_chart(make_radar_chart(dish["vector"], dish["name"]), width="stretch")
+                st.plotly_chart(
+                    make_radar_chart(dish["vector"], dish["name"]),
+                    use_container_width=True,
+                    config={"modeBarButtonsToRemove": ["zoom2d"]}
+                )
                 st.info(entry["explanation"])
 else:
     st.markdown("_Pick a mood, add any activities, and hit **Find My Meal** to see your matches._")
