@@ -83,7 +83,11 @@ if results:
                 st.plotly_chart(
                     make_radar_chart(dish["vector"], dish["name"]),
                     use_container_width=True,
-                    config={"modeBarButtonsToRemove": ["zoom2d"]}
+                    config={
+                        "displayModeBar": True,
+                        "modeBarButtonsToRemove": ["zoom2d", "pan2d", "lasso2d"],
+                        "toImageButtonOptions": {"format": "png"}
+                    }
                 )
                 st.info(entry["explanation"])
 else:
