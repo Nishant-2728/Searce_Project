@@ -104,7 +104,7 @@ if results:
                     config={
                         "displayModeBar": True,
                         "modeBarButtonsToRemove": ["zoom2d", "pan2d", "lasso2d"],
-                        "toImageButtonOptions": {"format": "png"}
+                        "toImageButtonOptions": {"format": "png"},
                         "displaylogo": False
                     }
                 )
