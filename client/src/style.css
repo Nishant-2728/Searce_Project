@@ -1,0 +1,4 @@
+body { font-family: Arial, Helvetica, sans-serif; padding: 20px; }
+input[type="file"] { margin-bottom: 8px }
+button { margin-top: 8px }
+.card { border: 1px solid #ddd; padding: 12px; border-radius: 6px; margin-bottom: 12px }

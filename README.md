@@ -1,41 +1,34 @@
-# Neural Taste Profile
+# Searce_Project - multimodal onboarding
 
-A Streamlit prototype for personalized food recommendations using **14-dimensional flavor vectors** and rule-based context matching. Built for RFP 2 (Zomato) of a Searce internal assignment on AI & Digital Transformation.
+This branch adds a basic onboarding flow (geolocation -> weather/time), a quick mood questionnaire, and a Web Bluetooth smartwatch connector that streams heart rate to the backend (via POST and WebSocket).
 
-## 🚀 Try it Live
+How to run locally
 
-**[Open the app on Streamlit Cloud](https://searceproject-8zfvnpxqbtxoo8aangt958.streamlit.app/)**
+1) Server
 
-## What It Does
+  cd server
+  npm install
+  # (optional) copy .env.example to .env and adjust PORT
+  node server.js
 
-Instead of "you like Italian, so try this pasta," this app:
+The server listens on port 4000 by default.
 
-1. **Represents every dish** as a 14-dimensional flavor vector (spice, acidity, richness, warmth, crunch, umami, sweetness, bitterness, saltiness, freshness, moisture, aroma, chewiness, temperature-contrast)
-2. **Reads your context** — time of day, mood, activity, and free-text cravings
-3. **Computes a target flavor vector** using explicit, rule-based deltas (no AI/ML calls)
-4. **Ranks dishes** by cosine similarity to your target
-5. **Explains why** each match works (e.g., "High Warmth + Richness — driven by Late Night and Stressed")
+2) Client (Vite + React)
 
-**No LLM API calls. No external inference. Fully deterministic and auditable.**
+  cd client
+  npm install
+  # create client/.env and add:
+  # VITE_OPENWEATHER_KEY=your_openweather_api_key
+  npm run dev
 
----
+Open the client (Vite will show a local URL like http://localhost:5173). Note: the client expects the backend WebSocket on port 4000 (ws://localhost:4000/ws/health).
 
-## ⚡ Quick Start
+Notes & next steps
+- This is an MVP scaffold. Replace in-memory storage with a database and add authentication for production.
+- Web Bluetooth has limited browser support (Chrome desktop/Android). For Apple Watch you will need a native iOS app + HealthKit integration.
+- Remove example API keys from repository and keep them in environment variables.
 
-### Online (Streamlit Cloud)
-Just click the link above — no installation needed.
+Testing
+- Use Chrome on desktop or Android to test the Web Bluetooth flow with a BLE heart-rate monitor.
+- If you don't have a device, you can POST sample health JSON to POST /api/health-data to exercise suggestion logic.
 
-### Local Development
-
-**Requirements:** Python 3.8+, `git`
-
-```bash
-# 1. Clone the repo
-git clone https://github.com/Darkspood/Searce_Project.git
-cd Searce_Project/app
-
-# 2. Set up virtual environment & install dependencies
-make install-dev
-
-# 3. Run the app
-make run
