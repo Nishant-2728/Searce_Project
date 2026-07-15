@@ -1,0 +1,328 @@
+NEURAL TASTE PROFILE
+Presentation Deck Content — 14 slides for a 15-minute talk (+5 min demo/Q&A)
+RFP 2 (Zomato) — Searce Internal Internship: AI & Digital Transformation
+================================================================================
+
+Pacing note: ~1 minute per slide. Slides 1-3 set up the problem fast so most
+of the time budget goes to slides 4-10 (the actual technical idea). Slides
+11-14 can move quickly since the demo covers the product experience live.
+
+
+--------------------------------------------------------------------------------
+SLIDE 1 — TITLE
+--------------------------------------------------------------------------------
+Title: Neural Taste Profile
+Subtitle: Reimagining food discovery for Zomato — beyond cuisine tags
+
+Content:
+- RFP 2: AI & Digital Transformation
+- Searce Internal Intern Assignment
+- [Your name] · [Date]
+
+Speaker note: One line — "Today I'll show why category browsing is the
+wrong abstraction for food discovery, and a working prototype of what
+replaces it."
+
+
+--------------------------------------------------------------------------------
+SLIDE 2 — AGENDA
+--------------------------------------------------------------------------------
+Title: What we'll cover
+
+Content:
+1. The problem: discovery fatigue on food apps
+2. The core idea: food as a flavor vector
+3. How real-time context drives a recommendation (LLM-fused)
+4. Keeping it safe: dietary & health filtering
+5. System architecture, tech stack, and engineering resilience
+6. Live demo
+7. Q&A
+
+Speaker note: Keep this slide on screen for ~15 seconds only.
+
+
+--------------------------------------------------------------------------------
+SLIDE 3 — THE PROBLEM: DISCOVERY FATIGUE
+--------------------------------------------------------------------------------
+Title: The problem: "What do I want to eat?" is not a category question
+
+Content:
+- Today's food apps ask: which cuisine? which restaurant? which cost bracket?
+- But hunger isn't a cuisine — it's a *feeling*: tired, celebratory, craving
+  something warm, wanting something light after a heavy day
+- Category browsing forces users to translate a mood into a search filter
+  themselves — that translation step is where discovery fatigue comes from
+- Result: users fall back to the same 3-4 "safe" orders on repeat, and the
+  platform's long-tail catalogue (thousands of dishes) goes undiscovered
+
+Speaker note: This is the "why" slide — spend a little extra time here,
+it's the entire justification for everything that follows.
+
+
+--------------------------------------------------------------------------------
+SLIDE 4 — OUR CORE IDEA: FOOD AS A FLAVOR VECTOR
+--------------------------------------------------------------------------------
+Title: Represent food as taste, not as a label
+
+Content:
+- Central claim: every dish can be represented as a point in a
+  multi-dimensional "flavor space" instead of a cuisine tag
+- If a user's current craving can be represented as a point in that same
+  space, recommendation becomes geometry — find the nearest dishes
+- This makes matches cross cuisine boundaries naturally: a craving for
+  "something warm and comforting" can surface Thai tom kha, North Indian
+  dal, or Japanese ramen — a cuisine filter could never do that
+- Built and tested this on a dataset of 400 dishes across 16 cuisines
+  (North & South Indian, Chinese, Italian, Continental, Fast Food, Desserts,
+  Beverages, Mexican, Thai, Japanese, Mediterranean, Korean, Middle
+  Eastern, Vietnamese, French)
+
+Speaker note: This is the headline idea of the whole project — say it
+slowly once.
+
+
+--------------------------------------------------------------------------------
+SLIDE 5 — THE 14-DIMENSION FLAVOR VECTOR
+--------------------------------------------------------------------------------
+Title: What's actually in a "flavor vector"?
+
+Content:
+- Every dish is scored 0-10 on 14 dimensions:
+  Spice, Acidity, Richness, Warmth, Crunch, Umami, Sweetness, Bitterness,
+  Saltiness, Freshness, Juiciness, Aroma, Chewiness, Temperature Contrast
+- These aren't nutritional facts — they're sensory/experiential axes,
+  hand-authored per dish alongside real dietary facts (allergens, vegetarian/
+  vegan status, sugar/fat/sodium levels)
+- A radar chart visualizes each dish's "flavor fingerprint" — instantly
+  more intuitive than a text description
+- Same 14 axes are used for the user's *target* vector, so a match is just
+  "how close are these two fingerprints" (cosine similarity)
+
+Speaker note: Show the radar chart from the app here if you have a
+screenshot slide, otherwise gesture at the live demo to come.
+
+
+--------------------------------------------------------------------------------
+SLIDE 6 — REAL-TIME CONTEXT: WHAT WE FUSE
+--------------------------------------------------------------------------------
+Title: The target vector isn't static — it's built from context, in real time
+
+Content:
+Signals fused into a single "what should this user eat right now" vector:
+- Time of day (auto-detected — Morning / Afternoon / Evening / Late Night),
+  using the user's real local time via browser geolocation + reverse
+  geocoding, not just the server's clock
+- Live weather at the user's detected location (Open-Meteo)
+- Simulated biometrics from a "connected smartwatch" — HRV, calories
+  burned, sleep score
+- A short optional mood quiz — energy level, how the day's been, anything
+  physical going on, what sounds appealing
+- Free-text craving — e.g. "something crunchy and tangy"
+
+Speaker note: Emphasize "auto-detected" and "real-time" — this is what
+makes it feel alive rather than a static quiz.
+
+
+--------------------------------------------------------------------------------
+SLIDE 7 — THE CONTEXT ENGINE: LLM-DRIVEN FUSION
+--------------------------------------------------------------------------------
+Title: Fusing five different signal types is an LLM's job, not a lookup table
+
+Content:
+- Early version of this prototype used hardcoded delta tables (if mood=X,
+  add +2 to spice, etc.) — brittle, and didn't scale to new signal types
+- Replaced with a single Claude API call: the full context payload (time,
+  weather, biometrics, quiz answers, craving text) goes in, and a
+  14-dimension target vector comes out — plus a **per-dimension rationale**
+- The rationale is the key design choice: it keeps "why this matched"
+  legible to the user instead of becoming a black box
+- This is the *only* place in the app that calls an external LLM —
+  everything downstream (filtering, matching, ranking) is plain
+  deterministic code
+
+Speaker note: This slide is the technical centerpiece — the pivot from
+rule-based to LLM-driven fusion is worth explaining as a design decision,
+not just a feature.
+
+
+--------------------------------------------------------------------------------
+SLIDE 8 — DIETARY & HEALTH SAFETY: HARD VS. SOFT FILTERS
+--------------------------------------------------------------------------------
+Title: A great-tasting match that could hurt someone isn't a good match
+
+Content:
+- Safety constraints are deliberately kept OUT of the LLM step and out of
+  the similarity score — they're deterministic code, so they can't be
+  "argued around" by a confident-sounding model output
+- HARD constraints (pre-filter, before matching ever runs):
+  dietary preference (vegetarian/vegan), allergies (nuts, shellfish, soy,
+  eggs, gluten, dairy), celiac, lactose intolerance
+  -> violating dishes are removed from the candidate pool entirely; no
+     similarity score can resurrect them
+- SOFT constraints (post-filter, within the already-safe set):
+  diabetic, high cholesterol, hypertension
+  -> down-weight a dish's score in proportion to sugar/fat/sodium level,
+     re-sort — never exclude, just nudge toward the safer option
+- Set up once via a Profile dialog; never re-asked per session
+
+Speaker note: This slide demonstrates engineering judgment, not just a
+feature list — call out explicitly that hard vs. soft was a deliberate
+architectural split, and walk through the two example scenarios below if
+there's time: (1) an allergy silently removes an otherwise-perfect match,
+(2) a diabetic profile just nudges the ranking, it doesn't remove dessert
+options entirely.
+
+
+--------------------------------------------------------------------------------
+SLIDE 9 — THE MATCHING ENGINE: COSINE SIMILARITY + EXPLAINABILITY
+--------------------------------------------------------------------------------
+Title: From target vector to top-5, with a reason attached to every result
+
+Content:
+- Cosine similarity between the target vector and every safe candidate
+  dish's vector — ranks by angular closeness, not raw magnitude
+- Fully deterministic and instant — no LLM call needed at ranking time
+- Top result also gets an explanation: the 2-3 flavor dimensions that
+  contributed most to the match, paired with the LLM's (or fallback's)
+  rationale text for that dimension
+  e.g. "You wanted something bold and intense, so spice leads."
+- This closes the loop: context in -> vector -> safe candidates -> ranked
+  matches -> human-readable "why"
+
+Speaker note: If time allows, mention this is what separates it from a
+typical recommender — most systems give you a score, not a reason.
+
+
+--------------------------------------------------------------------------------
+SLIDE 10 — SYSTEM ARCHITECTURE (END-TO-END PIPELINE)
+--------------------------------------------------------------------------------
+Title: How it all fits together
+
+Content (pipeline, left to right):
+Location + Weather + Biometrics + Mood Quiz + Craving
+        |
+        v
+  Context Engine (single Claude API call) --> target flavor vector + rationale
+        |
+        v
+  Dietary/Health Filter (hard pre-filter -> soft post-penalty, deterministic)
+        |
+        v
+  Matching Engine (cosine similarity, deterministic) --> ranked dishes
+        |
+        v
+  Top 5 results, each with a radar chart + plain-language explanation
+
+Modules: dishes.py (dataset) · context_engine.py · weather_client.py ·
+geolocation_client.py · location_client.py · llm_context_engine.py ·
+dietary_filter.py · matching_engine.py · charts.py · app.py (UI only) ·
+profile_dialog.py
+
+Speaker note: Emphasize that only ONE box in this diagram touches an
+external LLM — everything else is plain, testable, deterministic Python.
+
+
+--------------------------------------------------------------------------------
+SLIDE 11 — RESILIENCE: THE DETERMINISTIC FALLBACK
+--------------------------------------------------------------------------------
+Title: What happens when the AI service is unavailable?
+
+Content:
+- Every external call (Claude API, weather, geolocation, reverse geocoding)
+  is designed to never crash the app — failures degrade gracefully instead
+- If the LLM call fails for any reason (network, rate limit, timeout,
+  malformed response), a deterministic fallback vector takes over
+  automatically, built from a small fixed time-of-day + quiz/keyword delta
+  table
+- The UI clearly discloses this — a visible "using fallback" banner plus a
+  debug expander with the raw error — never a silent degradation
+- Same philosophy for weather/location: a failed fetch just quietly omits
+  that signal rather than blocking the whole flow
+
+Speaker note: This is a "we thought about production readiness, not just
+the happy path" slide — good to include for an engineering assignment.
+
+
+--------------------------------------------------------------------------------
+SLIDE 12 — TECH STACK
+--------------------------------------------------------------------------------
+Title: What it's built with
+
+Content:
+- Frontend/UI: Streamlit (single-page app + modal dialog for profile setup)
+- LLM: Anthropic Claude (claude-sonnet-5), structured output via Pydantic
+  schema (one value + rationale per flavor dimension)
+- Matching: NumPy (cosine similarity), Plotly (radar charts)
+- Real-time context: Open-Meteo (weather + timezone), Nominatim (reverse
+  geocoding), streamlit-js-eval (browser geolocation)
+- Testing: pytest, 93 tests — every external network/API call is mocked,
+  so the whole suite runs with zero real network calls and no API key
+- Styling: Zomato-brand theme (coral/red palette, Poppins typeface)
+
+Speaker note: Quick, factual slide — don't linger.
+
+
+--------------------------------------------------------------------------------
+SLIDE 13 — WHY THIS WINS: DIFFERENTIATION
+--------------------------------------------------------------------------------
+Title: Why this beats category browsing
+
+Content:
+- Cross-cuisine discovery: matches by taste, not by cuisine tag, so users
+  see dishes they'd never have searched for by name
+- Context-aware without extra taps: location, weather, and time are
+  auto-detected; the user only answers what they want to
+- Explainable, not a black box: every result comes with a plain-English
+  "why", building trust in the recommendation
+- Safety-first by construction: allergy/dietary constraints are hard
+  guarantees, not best-effort suggestions — enforced in code, before any
+  score is computed
+- Extensible: adding a new dish, cuisine, or quiz question doesn't require
+  touching the matching or filtering logic — same schema, same pipeline
+
+Speaker note: This is the "so what" slide — tie it back to slide 3's
+problem statement explicitly.
+
+
+--------------------------------------------------------------------------------
+SLIDE 14 — CHALLENGES, LEARNINGS & FUTURE ROADMAP
+--------------------------------------------------------------------------------
+Title: What we learned, and where this goes next
+
+Content:
+Challenges & learnings:
+- Rule-based context fusion (v1) didn't scale past a handful of signals —
+  motivated the pivot to LLM-driven fusion with explicit rationale output
+- Safety constraints must live outside the LLM's reach entirely — a
+  similarity score should never be able to override a hard dietary rule
+- Authoring a 400-dish dataset by hand surfaced real data-quality lessons:
+  cross-cuisine name collisions, keeping sugar/fat/sodium heuristics
+  consistent with the flavor vector
+
+Future roadmap:
+- Real order history instead of a one-time quiz, to personalize the target
+  vector over time
+- Persisted user profiles (currently session-only, by design, for this
+  prototype)
+- A/B testing flavor-vector recommendations against category browsing on
+  real engagement metrics
+- Expand real biometric integration (actual wearable APIs, not simulated)
+
+Speaker note: End on the roadmap, then hand off to the live demo.
+
+
+================================================================================
+END OF SLIDE CONTENT — DEMO SCRIPT SUGGESTION (not a slide, ~5 min)
+================================================================================
+1. Open the app fresh — show auto-detected location/time/weather populating
+   without any manual input.
+2. Answer the mood quiz + type a craving (e.g. "something warm and
+   comforting") — click Find My Meal.
+3. Point out: the rationale text under a result, the radar chart, the
+   similarity score badge.
+4. Open Edit Profile, set a dietary restriction or allergy, re-run the
+   search — show the "Excluded N dish(es)..." caption and that the
+   previously-top match is now gone.
+5. (Optional, if asked) Open the "Why fallback?" expander story: mention
+   the app still works fully even without an API key, just on the
+   deterministic baseline.
