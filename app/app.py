@@ -101,7 +101,9 @@ if (
 
     details = st.session_state.location_details
 
-    st.success(f"📍 {details['city']}")
+    st.success(
+        f"📍 {details['city']}, {details['state']}, {details['country']}"
+    )
     st.caption(f"🕒 {details['time'].strftime('%I:%M %p')}")
     st.caption(f"🌍 {details['timezone']}")
 if st.button("Check Weather", key="check_weather_btn"):
