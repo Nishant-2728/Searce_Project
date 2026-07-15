@@ -2,23 +2,34 @@ import requests
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+
 def get_location_details(lat, lon):
     # Reverse geocoding
     geo = requests.get(
-        "https://geocoding-api.open-meteo.com/v1/reverse",
+        "https://nominatim.openstreetmap.org/reverse",
         params={
-            "latitude": lat,
-            "longitude": lon,
-            "language": "en",
+            "lat": lat,
+            "lon": lon,
+            "format": "jsonv2",
+        },
+        headers={
+            "User-Agent": "NeuralTasteProfile/1.0"
         },
         timeout=10,
     ).json()
 
-    city = "Unknown"
-    if geo.get("results"):
-        city = geo["results"][0]["name"]
+    address = geo.get("address", {})
 
-    # Timezone + current local time
+    city = (
+        address.get("city")
+        or address.get("town")
+        or address.get("village")
+        or address.get("municipality")
+        or address.get("county")
+        or "Unknown"
+    )
+
+    # Get timezone
     weather = requests.get(
         "https://api.open-meteo.com/v1/forecast",
         params={
