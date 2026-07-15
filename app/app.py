@@ -31,6 +31,7 @@ import dietary_filter
 import geolocation_client
 import llm_context_engine
 import weather_client
+import location_client
 from charts import make_radar_chart
 from context_engine import QUIZ_QUESTIONS, get_time_bucket
 from dishes import DISHES
@@ -53,9 +54,6 @@ with profile_col:
 with button_col:
     if st.button("Edit Profile", key="edit_profile_btn", width="stretch"):
         edit_profile_dialog()
-
-time_bucket = get_time_bucket(datetime.now())
-st.info(f"🕒 Detected context: **{time_bucket}**")
 
 # --- Location & weather -----------------------------------------------------
 st.subheader("Where are you?")
@@ -91,8 +89,14 @@ else:
     lat, lon = weather_client.PRESET_CITIES[city]
 
 if st.session_state.detected_location:
-    lat, lon = st.session_state.detected_location["lat"], st.session_state.detected_location["lon"]
-    st.caption(f"📍 Using detected location ({lat:.3f}, {lon:.3f}) — weather auto-fetched.")
+    lat = st.session_state.detected_location["lat"]
+    lon = st.session_state.detected_location["lon"]
+
+    details = st.session_state.location_details
+
+    st.success(f"📍 {details['city']}")
+    st.caption(f"🕒 {details['time'].strftime('%I:%M %p')}")
+    st.caption(f"🌍 {details['timezone']}")
 
 if st.button("Check Weather", key="check_weather_btn"):
     st.session_state.weather_data = weather_client.get_current_weather(lat, lon)
@@ -130,7 +134,13 @@ craving = st.text_input(
     key="craving_input",
     label_visibility="collapsed",
 )
-
+if "location_details" in st.session_state:
+    st.info(
+        f"Detected context: **{get_time_bucket(st.session_state.location_details['time'])}**"
+    )
+else:
+    time_bucket = get_time_bucket(datetime.now())
+    st.info(f"Detected context: **{time_bucket}**")
 find_meal = st.button("Find My Meal", type="primary", width="stretch", key="find_meal_btn")
 
 if "results" not in st.session_state:
