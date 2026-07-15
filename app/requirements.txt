@@ -5,3 +5,4 @@ anthropic
 requests
 pydantic
 python-dotenv
+streamlit-js-eval
