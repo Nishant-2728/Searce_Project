@@ -70,6 +70,10 @@ if "auto_weather_location" not in st.session_state:
 detected = geolocation_client.get_browser_location()
 if detected:
     st.session_state.detected_location = detected
+    st.session_state.location_details = location_client.get_location_details(
+        detected["lat"],
+        detected["lon"]
+    )
     fetched_for = (detected["lat"], detected["lon"])
     if st.session_state.auto_weather_location != fetched_for:
         st.session_state.weather_data = weather_client.get_current_weather(detected["lat"], detected["lon"])
@@ -88,7 +92,10 @@ if city == "Custom location":
 else:
     lat, lon = weather_client.PRESET_CITIES[city]
 
-if st.session_state.detected_location:
+if (
+    st.session_state.detected_location
+    and "location_details" in st.session_state
+):
     lat = st.session_state.detected_location["lat"]
     lon = st.session_state.detected_location["lon"]
 
@@ -97,7 +104,6 @@ if st.session_state.detected_location:
     st.success(f"📍 {details['city']}")
     st.caption(f"🕒 {details['time'].strftime('%I:%M %p')}")
     st.caption(f"🌍 {details['timezone']}")
-
 if st.button("Check Weather", key="check_weather_btn"):
     st.session_state.weather_data = weather_client.get_current_weather(lat, lon)
     if st.session_state.weather_data is None:
@@ -135,12 +141,13 @@ craving = st.text_input(
     label_visibility="collapsed",
 )
 if "location_details" in st.session_state:
-    st.info(
-        f"Detected context: **{get_time_bucket(st.session_state.location_details['time'])}**"
+    time_bucket = get_time_bucket(
+        st.session_state.location_details["time"]
     )
 else:
     time_bucket = get_time_bucket(datetime.now())
-    st.info(f"Detected context: **{time_bucket}**")
+
+st.info(f"🕒 Detected context: **{time_bucket}**")
 find_meal = st.button("Find My Meal", type="primary", width="stretch", key="find_meal_btn")
 
 if "results" not in st.session_state:
