@@ -70,9 +70,9 @@ def get_time_bucket(now):
     hour = now.hour
     if 5 <= hour < 12:
         return "Morning"
-    if 12 <= hour < 17:
+    if 12 <= hour < 16:
         return "Afternoon"
-    if 17 <= hour < 21:
+    if 16 <= hour < 19:
         return "Evening"
     return "Late Night"
 
