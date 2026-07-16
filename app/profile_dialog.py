@@ -45,7 +45,7 @@ def edit_profile_dialog() -> None:
         "instead of asking every time."
     )
 
-    st.subheader("Dietary preference")
+    st.subheader("🥗 Dietary preference")
     st.radio(
         "Choose your dietary preference",
         DIETARY_OPTIONS,
@@ -54,7 +54,7 @@ def edit_profile_dialog() -> None:
         horizontal=True,
     )
 
-    st.subheader("Allergies")
+    st.subheader("⚠️ Allergies")
     st.multiselect(
         "Select any allergies",
         options=dietary_filter.ALLERGEN_OPTIONS,
@@ -62,7 +62,7 @@ def edit_profile_dialog() -> None:
         key="allergies",
     )
 
-    st.subheader("Health conditions")
+    st.subheader("🩺 Health conditions")
     persisted_health_conditions = st.session_state.get("health_conditions", [])
     health_conditions = []
     for condition in dietary_filter.HEALTH_CONDITIONS:
@@ -75,7 +75,7 @@ def edit_profile_dialog() -> None:
             health_conditions.append(condition["code"])
     st.session_state.health_conditions = health_conditions
 
-    st.subheader("Connect smartwatch")
+    st.subheader("⌚ Connect smartwatch")
     smartwatch_connected = st.checkbox(
         "Connect smartwatch (simulated)",
         value=st.session_state.get("smartwatch_connected", False),

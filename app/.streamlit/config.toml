@@ -1,0 +1,17 @@
+[theme]
+# Zomato's signature red/coral accent (buttons, links, active elements).
+primaryColor = "#E23744"
+
+# Warm off-white page background, and a soft coral-cream tint (rather than
+# Streamlit's default cool gray) for widget chrome — selectboxes, expanders,
+# code blocks — so the whole page reads warmer and stays on-brand even where
+# the primary color isn't directly used.
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#FFF3F0"
+
+# Zomato's actual brand typeface is "Okra", a proprietary customization of the
+# open-source geometric sans "Metropolis". Poppins is used here instead as a
+# clean, freely-usable geometric sans in the same family, loaded from Google
+# Fonts since it isn't bundled with the app.
+font = "Poppins:https://fonts.googleapis.com/css2?family=Poppins&display=swap"
+

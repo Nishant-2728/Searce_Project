@@ -17,6 +17,7 @@ from streamlit.testing.v1 import AppTest
 
 import geolocation_client
 import llm_context_engine
+import location_client
 import weather_client
 from context_engine import get_time_bucket
 from dishes import DIMENSIONS, DISHES
@@ -187,8 +188,19 @@ def test_geolocation_success_auto_fetches_weather_on_load(monkeypatch):
     weather_calls = []
     monkeypatch.setattr(
         geolocation_client,
-        "get_browser_location",
-        lambda: {"lat": 40.7128, "lon": -74.006},
+        "get_browser_location_status",
+        lambda: {"status": "success", "lat": 40.7128, "lon": -74.006},
+    )
+    monkeypatch.setattr(
+        location_client,
+        "get_location_details",
+        lambda lat, lon, timeout=10.0: {
+            "city": "New York",
+            "state": "New York",
+            "country": "United States",
+            "timezone": "America/New_York",
+            "time": datetime(2026, 1, 1, 9, 0),
+        },
     )
 
     def _fake_weather(lat, lon, timeout=5.0):
@@ -204,11 +216,13 @@ def test_geolocation_success_auto_fetches_weather_on_load(monkeypatch):
     assert at.session_state["detected_location"] == {"lat": 40.7128, "lon": -74.006}
     assert at.session_state["weather_data"]["temperature_c"] == 22.5
     assert weather_calls == [(40.7128, -74.006)]
-    assert any("40.713" in c.value for c in at.caption)
+    assert any("New York" in c.value for c in at.success)
 
 
 def test_geolocation_failure_falls_back_to_manual_dropdown(monkeypatch):
-    monkeypatch.setattr(geolocation_client, "get_browser_location", lambda: None)
+    monkeypatch.setattr(
+        geolocation_client, "get_browser_location_status", lambda: {"status": "pending"}
+    )
     at = AppTest.from_file(APP_PATH)
     at.run()
 
@@ -218,12 +232,35 @@ def test_geolocation_failure_falls_back_to_manual_dropdown(monkeypatch):
     assert any("Waiting for browser location permission" in c.value for c in at.caption)
 
 
+def test_geolocation_denied_shows_actionable_message(monkeypatch):
+    monkeypatch.setattr(
+        geolocation_client, "get_browser_location_status", lambda: {"status": "denied"}
+    )
+    at = AppTest.from_file(APP_PATH)
+    at.run()
+
+    assert not at.exception
+    assert at.session_state["detected_location"] is None
+    assert any("Location permission denied" in c.value for c in at.caption)
+
+
 def test_detected_location_and_weather_persist_across_an_unrelated_rerun(monkeypatch):
     weather_calls = []
     monkeypatch.setattr(
         geolocation_client,
-        "get_browser_location",
-        lambda: {"lat": 40.7128, "lon": -74.006},
+        "get_browser_location_status",
+        lambda: {"status": "success", "lat": 40.7128, "lon": -74.006},
+    )
+    monkeypatch.setattr(
+        location_client,
+        "get_location_details",
+        lambda lat, lon, timeout=10.0: {
+            "city": "New York",
+            "state": "New York",
+            "country": "United States",
+            "timezone": "America/New_York",
+            "time": datetime(2026, 1, 1, 9, 0),
+        },
     )
 
     def _fake_weather(lat, lon, timeout=5.0):

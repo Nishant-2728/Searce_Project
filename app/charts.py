@@ -20,8 +20,8 @@ def make_radar_chart(vector, title=""):
             theta=categories,
             fill="toself",
             name=title,
-            line_color="#7c5cff",
-            fillcolor="rgba(124, 92, 255, 0.45)",
+            line_color="#E23744",
+            fillcolor="rgba(226, 55, 68, 0.25)",
         )
     )
     fig.update_layout(
@@ -29,5 +29,7 @@ def make_radar_chart(vector, title=""):
         showlegend=False,
         margin=dict(l=30, r=30, t=20, b=20),
         height=280,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
     )
     return fig

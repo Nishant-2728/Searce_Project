@@ -16,6 +16,7 @@ PRESET_CITIES = {
     "Delhi": (28.6139, 77.209),
     "Bengaluru": (12.9716, 77.5946),
     "Chennai": (13.0827, 80.2707),
+    "Pune": (18.5204, 73.8567),
     "Custom location": None,
 }
 
