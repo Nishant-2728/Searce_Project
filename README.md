@@ -40,6 +40,12 @@ make test          # or: make test-verbose
 
 The full suite runs in under 2 seconds and makes zero real network or API calls — everything is mocked.
 
+## 🚀 Quick Demo
+
+Try the live application here:
+
+👉 **https://searceproject-8zfvnpxqbtxoo8aangt958.streamlit.app/**
+
 ## Project Structure
 
 See [`CLAUDE.md`](CLAUDE.md) for a full architecture breakdown (module-by-module) and contributor guidance.
